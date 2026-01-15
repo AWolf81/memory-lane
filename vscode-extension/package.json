@@ -1,0 +1,146 @@
+{
+  "name": "memorylane",
+  "displayName": "MemoryLane",
+  "description": "Zero-config persistent memory for Claude with automatic cost savings",
+  "version": "0.1.0",
+  "publisher": "memorylane",
+  "icon": "resources/icon.png",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Other"
+  ],
+  "keywords": [
+    "ai",
+    "claude",
+    "memory",
+    "cost-savings",
+    "context-compression"
+  ],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "memorylane.showStatus",
+        "title": "MemoryLane: Show Status"
+      },
+      {
+        "command": "memorylane.showInsights",
+        "title": "MemoryLane: Show Insights"
+      },
+      {
+        "command": "memorylane.showCostSavings",
+        "title": "MemoryLane: Show Cost Savings"
+      },
+      {
+        "command": "memorylane.startLearning",
+        "title": "MemoryLane: Start Learning"
+      },
+      {
+        "command": "memorylane.stopLearning",
+        "title": "MemoryLane: Stop Learning"
+      },
+      {
+        "command": "memorylane.resetMemory",
+        "title": "MemoryLane: Reset All Memories"
+      },
+      {
+        "command": "memorylane.showKnowledgeGraph",
+        "title": "MemoryLane: Show Knowledge Graph"
+      },
+      {
+        "command": "memorylane.exportContext",
+        "title": "MemoryLane: Export Context as Markdown"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "memorylane-sidebar",
+          "title": "MemoryLane",
+          "icon": "resources/sidebar-icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "memorylane-sidebar": [
+        {
+          "id": "memorylane.overview",
+          "name": "Overview"
+        },
+        {
+          "id": "memorylane.memories",
+          "name": "Memories"
+        },
+        {
+          "id": "memorylane.insights",
+          "name": "Insights"
+        },
+        {
+          "id": "memorylane.savings",
+          "name": "Cost Savings"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "MemoryLane",
+      "properties": {
+        "memorylane.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically start MemoryLane server on workspace open"
+        },
+        "memorylane.autoLearn": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically learn from file changes and git commits"
+        },
+        "memorylane.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show MemoryLane status in status bar"
+        },
+        "memorylane.maxContextTokens": {
+          "type": "number",
+          "default": 2000,
+          "description": "Maximum context tokens for compression"
+        },
+        "memorylane.compressionRatio": {
+          "type": "number",
+          "default": 7.0,
+          "description": "Target compression ratio"
+        },
+        "memorylane.pythonPath": {
+          "type": "string",
+          "default": "python3",
+          "description": "Path to Python executable"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile",
+    "test": "node ./out/test/runTest.js",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.80.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint": "^8.45.0",
+    "typescript": "^5.1.6"
+  },
+  "dependencies": {
+    "d3": "^7.8.5",
+    "@types/d3": "^7.4.0"
+  }
+}

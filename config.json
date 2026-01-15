@@ -1,0 +1,81 @@
+{
+  "memory": {
+    "max_context_tokens": 2000,
+    "compression_ratio_target": 7.0,
+    "max_memories_per_category": 150,
+    "relevance_threshold": 0.7,
+    "enable_passive_learning": true,
+    "update_frequency_seconds": 30
+  },
+
+  "learning": {
+    "watch_file_changes": true,
+    "watch_git_commits": true,
+    "watch_terminal_output": false,
+    "index_on_startup": true,
+    "incremental_updates": true,
+    "surprise_threshold": 0.6
+  },
+
+  "compression": {
+    "target_ratio": 7.0,
+    "min_ratio": 3.0,
+    "preserve_important": true,
+    "deduplication_threshold": 0.85,
+    "summarization_enabled": true
+  },
+
+  "costs": {
+    "track_savings": true,
+    "baseline_token_count": 20000,
+    "cost_per_million_input_tokens": 3.0,
+    "cost_per_million_output_tokens": 15.0,
+    "show_savings_in_statusbar": true
+  },
+
+  "privacy": {
+    "encrypt_at_rest": true,
+    "exclude_patterns": [
+      "*.env",
+      "*.key",
+      "*.pem",
+      "*.pfx",
+      "**/secrets/**",
+      "**/credentials/**",
+      "**/.git/**",
+      "**/node_modules/**",
+      "**/__pycache__/**",
+      "**/*.pyc"
+    ],
+    "allow_terminal_capture": false,
+    "local_only": true
+  },
+
+  "performance": {
+    "max_ram_mb": 2048,
+    "max_vram_mb": 4096,
+    "retrieval_latency_ms": 100,
+    "update_latency_ms": 200,
+    "max_concurrent_operations": 4,
+    "cache_embeddings": true
+  },
+
+  "paths": {
+    "memory_dir": ".memorylane",
+    "memories_file": ".memorylane/memories.json",
+    "config_file": ".memorylane/config.json",
+    "backup_dir": ".memorylane/backups",
+    "logs_dir": ".memorylane/logs",
+    "embeddings_cache": ".memorylane/embeddings.db",
+    "metrics_file": ".memorylane/metrics.json"
+  },
+
+  "features": {
+    "cost_tracking": true,
+    "compression": true,
+    "passive_learning": true,
+    "auto_context_injection": true,
+    "git_integration": true,
+    "terminal_integration": false
+  }
+}

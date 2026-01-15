@@ -1,0 +1,5 @@
+# MemoryLane has ZERO production dependencies
+# Pure Python implementation for maximum compatibility
+
+# All dependencies are development-only
+# Install with: pip install -r requirements-dev.txt

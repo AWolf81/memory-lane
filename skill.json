@@ -1,0 +1,90 @@
+{
+  "name": "memorylane",
+  "version": "0.1.0",
+  "description": "Zero-config persistent memory for Claude with automatic cost savings",
+  "type": "skill",
+  "author": "MemoryLane Team",
+
+  "main": "src/memorylane_server.py",
+
+  "triggers": {
+    "keywords": [
+      "memory",
+      "memorylane",
+      "remember",
+      "context",
+      "cost savings",
+      "reduce tokens"
+    ],
+    "patterns": [
+      "remember (this|that|my)",
+      "what do you (know|remember) about",
+      "reduce (my )?(API|token) costs?",
+      "optimize (my )?context"
+    ],
+    "auto_activate": true
+  },
+
+  "capabilities": [
+    "persistent-memory",
+    "context-compression",
+    "cost-tracking",
+    "passive-learning",
+    "automatic-context-injection"
+  ],
+
+  "commands": {
+    "status": {
+      "description": "Show MemoryLane status and cost savings",
+      "usage": "python3 src/cli.py status"
+    },
+    "recall": {
+      "description": "Recall memories about a topic",
+      "usage": "python3 src/cli.py recall <query>"
+    },
+    "insights": {
+      "description": "View learned project insights",
+      "usage": "python3 src/cli.py insights"
+    },
+    "costs": {
+      "description": "View detailed cost savings breakdown",
+      "usage": "python3 src/cli.py costs"
+    },
+    "config": {
+      "description": "Configure MemoryLane settings",
+      "usage": "python3 src/cli.py config [set|get] <key> [value]"
+    },
+    "reset": {
+      "description": "Reset all memories (with confirmation)",
+      "usage": "python3 src/cli.py reset"
+    }
+  },
+
+  "sidecar": {
+    "enabled": true,
+    "command": "python3 -m src.server",
+    "auto_start": true,
+    "health_check": {
+      "type": "file",
+      "path": ".memorylane/server.pid"
+    },
+    "startup_timeout_ms": 5000,
+    "restart_on_failure": true
+  },
+
+  "hooks": {
+    "postInstall": "bash install.sh",
+    "preUninstall": "python3 src/cli.py backup --before-uninstall"
+  },
+
+  "dependencies": {
+    "python": ">=3.8",
+    "required_packages": []
+  },
+
+  "privacy": {
+    "data_collection": "none",
+    "local_only": true,
+    "encrypted_at_rest": true
+  }
+}

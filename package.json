@@ -1,0 +1,38 @@
+{
+  "name": "memorylane",
+  "version": "0.1.0",
+  "description": "Zero-config persistent memory for Claude with automatic cost savings",
+  "main": "src/server.py",
+  "scripts": {
+    "install": "bash install.sh",
+    "status": "python3 src/cli.py status",
+    "insights": "python3 src/cli.py insights",
+    "costs": "python3 src/cli.py costs",
+    "server:start": "python3 src/server.py start",
+    "server:stop": "python3 src/server.py stop",
+    "server:status": "python3 src/server.py status",
+    "learn:initial": "python3 src/learner.py initial",
+    "learn:watch": "python3 src/learner.py watch",
+    "test": "pytest",
+    "test:cost": "pytest tests/test_cost_savings.py -v -s",
+    "test:coverage": "pytest --cov=src --cov-report=html"
+  },
+  "keywords": [
+    "claude",
+    "memory",
+    "ai",
+    "context",
+    "compression",
+    "cost-savings",
+    "productivity"
+  ],
+  "author": "MemoryLane Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/memorylane.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/memorylane/issues"
+  }
+}

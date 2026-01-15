@@ -100,6 +100,45 @@ AI remembers your project—locally, privately, cheaply—eliminating repetitive
 - FAISS for fast vector similarity search at scale
 - PyTorch for model training with 4-bit quantization for efficiency
 
+### Available Code Foundation (ace-system-skill)
+**Location**: `/media/alexander/code/projects/ace-system-skill`
+
+Highly relevant existing codebase implementing ACE (Adaptive Context Engineering) framework with proven results:
+- **54.5% improvement in Pass@1 accuracy** on coding tasks
+- **Playbook management system** for storing learned patterns (JSON-based storage)
+- **Context optimization** tools for analysis and cleanup
+- **IPC patterns** and configuration management
+- **Validation framework** with statistical analysis
+- **MLflow integration** for experiment tracking mentioned in docs
+
+**Reusable Components**:
+1. **Playbook Manager** (`src/ace/playbook_manager.py`)
+   - JSON-based storage for learned patterns
+   - CRUD operations for strategies, errors, best practices
+   - Markdown export for context injection
+   - Metadata tracking (usage counts, timestamps)
+   - **Direct application**: Foundation for memory storage format
+
+2. **ACE System Core** (`src/validation/ace-system.py`)
+   - Configuration management (JSON)
+   - File analysis (line counts, quality metrics)
+   - Backup system with timestamps
+   - Orchestration patterns (analyze → optimize → learn)
+   - **Direct application**: Sidecar service architecture template
+
+3. **Validation Framework** (`src/validation/`)
+   - Statistical analysis (paired t-tests, Bonferroni correction)
+   - Paper comparison methodology
+   - Success criteria validation
+   - **Direct application**: Quality metrics and benchmarking
+
+4. **Architecture Patterns**:
+   - `.ace-playbooks/` for local storage (mirrors our `~/.memorylane/`)
+   - Progressive disclosure in documentation
+   - CLI-first development approach
+   - Dry-run modes for safety
+   - **Direct application**: Overall system design patterns
+
 ### User Journey
 1. **Passive Learning**: Extension watches file edits, git commits, terminal output
 2. **Smart Context Injection**: When user invokes AI assistant, sidecar provides compressed relevant context (2K vs 20K tokens)
@@ -138,6 +177,7 @@ AI remembers your project—locally, privately, cheaply—eliminating repetitive
 | 6-week timeline | Aggressive but achievable, forces scope discipline, portfolio timeline | — Pending |
 | Open core monetization | Free tier builds adoption, pro tier captures value, sustainable | — Pending |
 | MLflow for experiment tracking | Industry standard, good UX, enables A/B testing | — Pending |
+| Leverage ace-system-skill codebase | Proven architecture (54.5% improvement), saves 1-2 weeks, battle-tested patterns | — Pending |
 
 ---
-*Last updated: 2026-01-15 after initialization from comprehensive PRD*
+*Last updated: 2026-01-15 after research and code foundation discovery*
