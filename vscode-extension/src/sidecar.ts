@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import * as net from 'net';
 import * as child_process from 'child_process';
 import * as path from 'path';
+import * as fs from 'fs';
+import * as crypto from 'crypto';
 
 export interface MemoryStats {
     memory: {
@@ -35,12 +37,27 @@ export interface Memory {
 
 export class SidecarManager {
     private serverProcess: child_process.ChildProcess | null = null;
-    private socketPath = '/tmp/memorylane.sock';
+    private socketPath: string;
     private learningProcess: child_process.ChildProcess | null = null;
     private workspaceRoot: string;
+    private sidecarRoot: string;  // Where Python sidecar files are located
 
     constructor(private context: vscode.ExtensionContext) {
         this.workspaceRoot = vscode.workspace.workspaceFolders?.[0].uri.fsPath || '';
+        // Sidecar is one level up from the extension directory (vscode-extension/../src/)
+        this.sidecarRoot = path.dirname(context.extensionPath);
+        // Generate workspace-specific socket path for isolation
+        this.socketPath = this.getWorkspaceSocketPath();
+    }
+
+    private getWorkspaceSocketPath(): string {
+        if (!this.workspaceRoot) {
+            // Fallback for no workspace - use sidecar root
+            const hash = crypto.createHash('md5').update(this.sidecarRoot).digest('hex').slice(0, 8);
+            return `/tmp/memorylane-${hash}.sock`;
+        }
+        const hash = crypto.createHash('md5').update(this.workspaceRoot).digest('hex').slice(0, 8);
+        return `/tmp/memorylane-${hash}.sock`;
     }
 
     async start(): Promise<void> {
@@ -50,22 +67,59 @@ export class SidecarManager {
         }
 
         const config = vscode.workspace.getConfiguration('memorylane');
-        const pythonPath = config.get('pythonPath', 'python3');
+        const pythonPath = config.get<string>('pythonPath', 'python3');
 
-        const serverScript = path.join(this.workspaceRoot, 'src', 'server.py');
+        const serverScript = path.join(this.sidecarRoot, 'src', 'server.py');
+
+        // Use workspace if available, otherwise use sidecar root for data storage
+        const dataDir = this.workspaceRoot || this.sidecarRoot;
+
+        // Validate server script exists
+        if (!fs.existsSync(serverScript)) {
+            throw new Error(`Server script not found: ${serverScript}`);
+        }
 
         console.log('Starting MemoryLane sidecar...');
+        console.log(`Python: ${pythonPath}, Script: ${serverScript}`);
 
-        this.serverProcess = child_process.spawn(pythonPath, [serverScript, 'start'], {
-            cwd: this.workspaceRoot,
+        // Collect stderr for error reporting
+        let stderrOutput = '';
+
+        this.serverProcess = child_process.spawn(pythonPath, [serverScript, 'start', '--socket', this.socketPath], {
+            cwd: dataDir,
             detached: true,
-            stdio: 'ignore'
+            stdio: ['ignore', 'ignore', 'pipe']  // Capture stderr
+        });
+
+        // Capture stderr for debugging
+        if (this.serverProcess.stderr) {
+            this.serverProcess.stderr.on('data', (data) => {
+                stderrOutput += data.toString();
+                console.error('Sidecar stderr:', data.toString());
+            });
+        }
+
+        // Handle process errors
+        this.serverProcess.on('error', (err) => {
+            console.error('Failed to spawn sidecar process:', err);
         });
 
         this.serverProcess.unref();
 
         // Wait for server to be ready
-        await this.waitForServer();
+        try {
+            await this.waitForServer();
+        } catch (e) {
+            // Clean up process reference on failure
+            this.serverProcess = null;
+
+            // Provide more helpful error message
+            let errorMsg = 'Server failed to start';
+            if (stderrOutput) {
+                errorMsg += `: ${stderrOutput.trim().split('\n').pop()}`;
+            }
+            throw new Error(errorMsg);
+        }
 
         vscode.window.showInformationMessage('🧠 MemoryLane server started');
     }
@@ -173,11 +227,12 @@ export class SidecarManager {
     async resetMemory(): Promise<void> {
         const config = vscode.workspace.getConfiguration('memorylane');
         const pythonPath = config.get('pythonPath', 'python3');
-        const cliScript = path.join(this.workspaceRoot, 'src', 'cli.py');
+        const cliScript = path.join(this.sidecarRoot, 'src', 'cli.py');
+        const dataDir = this.workspaceRoot || this.sidecarRoot;
 
         await new Promise((resolve, reject) => {
             const proc = child_process.spawn(pythonPath, [cliScript, 'reset', '--force'], {
-                cwd: this.workspaceRoot
+                cwd: dataDir
             });
 
             proc.on('close', (code) => {
@@ -197,10 +252,11 @@ export class SidecarManager {
 
         const config = vscode.workspace.getConfiguration('memorylane');
         const pythonPath = config.get('pythonPath', 'python3');
-        const learnerScript = path.join(this.workspaceRoot, 'src', 'learner.py');
+        const learnerScript = path.join(this.sidecarRoot, 'src', 'learner.py');
+        const dataDir = this.workspaceRoot || this.sidecarRoot;
 
         this.learningProcess = child_process.spawn(pythonPath, [learnerScript, 'watch'], {
-            cwd: this.workspaceRoot,
+            cwd: dataDir,
             detached: true,
             stdio: 'ignore'
         });
@@ -220,4 +276,94 @@ export class SidecarManager {
         // The learner.py watch process will pick this up
         console.log(`File ${changeType}: ${filePath}`);
     }
+
+    async getRegisteredProjects(): Promise<ProjectInfo[]> {
+        const config = vscode.workspace.getConfiguration('memorylane');
+        const pythonPath = config.get('pythonPath', 'python3');
+        const cliScript = path.join(this.sidecarRoot, 'src', 'cli.py');
+
+        return new Promise((resolve, reject) => {
+            const proc = child_process.spawn(pythonPath, [cliScript, 'projects', 'list', '--json'], {
+                cwd: this.workspaceRoot || this.sidecarRoot
+            });
+
+            let stdout = '';
+            let stderr = '';
+
+            proc.stdout?.on('data', (data) => { stdout += data.toString(); });
+            proc.stderr?.on('data', (data) => { stderr += data.toString(); });
+
+            proc.on('close', (code) => {
+                if (code === 0) {
+                    try {
+                        // Parse the JSON output - for now return parsed list
+                        // The CLI currently outputs human-readable format, not JSON
+                        // So we'll parse the text output
+                        const projects: ProjectInfo[] = [];
+                        const lines = stdout.split('\n');
+                        let currentProject: Partial<ProjectInfo> = {};
+
+                        for (const line of lines) {
+                            if (line.startsWith('✓') || line.startsWith('✗')) {
+                                if (currentProject.name) {
+                                    projects.push(currentProject as ProjectInfo);
+                                }
+                                currentProject = {
+                                    name: line.substring(2).trim(),
+                                    valid: line.startsWith('✓')
+                                };
+                            } else if (line.includes('Path:')) {
+                                currentProject.path = line.split('Path:')[1].trim();
+                            }
+                        }
+                        if (currentProject.name) {
+                            projects.push(currentProject as ProjectInfo);
+                        }
+
+                        resolve(projects);
+                    } catch (e) {
+                        resolve([]);
+                    }
+                } else {
+                    resolve([]);
+                }
+            });
+        });
+    }
+
+    async getCrossProjectMemories(query?: string, projectNames?: string[]): Promise<Memory[]> {
+        const config = vscode.workspace.getConfiguration('memorylane');
+        const pythonPath = config.get('pythonPath', 'python3');
+        const cliScript = path.join(this.sidecarRoot, 'src', 'cli.py');
+
+        const args = [cliScript, 'projects', 'search'];
+        if (query) {
+            args.push('--query', query);
+        }
+
+        return new Promise((resolve, reject) => {
+            const proc = child_process.spawn(pythonPath, args, {
+                cwd: this.workspaceRoot || this.sidecarRoot
+            });
+
+            let stdout = '';
+            proc.stdout?.on('data', (data) => { stdout += data.toString(); });
+
+            proc.on('close', (code) => {
+                // For now, return empty - the search output is human readable
+                // In a full implementation, we'd add --json flag to the CLI
+                resolve([]);
+            });
+        });
+    }
+
+    getWorkspaceName(): string {
+        return path.basename(this.workspaceRoot) || 'current';
+    }
+}
+
+export interface ProjectInfo {
+    name: string;
+    path: string;
+    valid: boolean;
 }

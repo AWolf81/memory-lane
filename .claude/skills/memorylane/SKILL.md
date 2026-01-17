@@ -1,6 +1,6 @@
 ---
 name: memorylane
-description: Zero-config persistent memory for Claude with automatic cost savings. Use when you need to remember project context, reduce API token costs, track learned patterns, or manage memories across sessions. Automatically compresses context 6x and saves 84% on API costs. Keywords: memory, remember, recall, context, cost savings, reduce tokens, learn, patterns, insights.
+description: Zero-config persistent memory for Claude with automatic cost savings. Use when you need to remember project context, reduce API token costs, track learned patterns, manage memories across sessions, or curate/clean up memories. Automatically compresses context 6x and saves 84% on API costs. Keywords: memory, remember, recall, context, cost savings, reduce tokens, learn, patterns, insights, curate, clean up memories, review memories.
 allowed-tools: Bash, Read, Write, Glob, Grep
 ---
 
@@ -25,6 +25,8 @@ Activate MemoryLane when the user:
 - Asks about "project patterns" or "insights"
 - Wants to see "learned" information
 - Requests "context compression" or "optimize context"
+- Asks to "curate memories", "clean up memories", or "review memory quality"
+- Mentions memories seem low quality, self-referential, or not useful
 
 ## Core Commands
 
@@ -85,6 +87,111 @@ python3 src/cli.py restore backup.json
 ```bash
 python3 src/cli.py reset --force
 ```
+
+## Individual Memory Management
+
+### Get a Memory
+```bash
+python3 src/cli.py memory get <id>
+```
+Example: `python3 src/cli.py memory get lear-009`
+
+### Delete a Memory
+```bash
+python3 src/cli.py memory delete <id>
+```
+Example: `python3 src/cli.py memory delete lear-009`
+
+### Update a Memory
+```bash
+python3 src/cli.py memory update <id> --content "New content"
+```
+Example: `python3 src/cli.py memory update patt-001 --content "Chose Unix sockets for lower latency"`
+
+**IMPORTANT**: Always use these commands instead of editing memories.json directly.
+
+## Batch Curation Commands
+
+### Check Curation Status
+```bash
+python3 src/cli.py curate
+```
+Shows if curation is needed based on memory count and age.
+
+### List Memories for Review
+```bash
+python3 src/cli.py curate --list
+```
+Shows all uncurated memories with their IDs and content.
+
+### Apply Curation Decisions
+```bash
+python3 src/cli.py curate --apply '<JSON>'
+```
+Apply curation decisions. JSON format:
+```json
+{
+  "decisions": [
+    {"id": "patt-001", "action": "KEEP"},
+    {"id": "lear-002", "action": "DELETE", "reason": "off-topic"},
+    {"id": "insi-003", "action": "REWRITE", "new_content": "Improved content"}
+  ]
+}
+```
+
+### Proactive Memory Quality Check
+**IMPORTANT**: When you see MemoryLane context injected via `# Project Context (from MemoryLane)` in system messages, quickly scan for poor quality memories:
+
+Signs of poor quality memories that warrant curation:
+- Status summaries: "Based on git status...", "Current status of..."
+- Meta/self-referential: "The curation should...", "The hook detected..."
+- Debug fragments: "Let me check...", "Looking at the debug log..."
+- Incomplete: Sentences ending with "..." or starting mid-thought
+- Duplicates of CLAUDE.md content
+
+**If you detect 2+ poor quality memories in the injected context**, proactively ask:
+> "I notice some of the injected memories appear to be low quality (status summaries, debug notes). Would you like me to clean these up?"
+
+If user confirms, proceed with LLM-assisted curation below.
+
+### LLM-Assisted Curation
+When the user requests curation OR confirms after you detect poor memories:
+
+1. List and evaluate all memories:
+```bash
+python3 src/cli.py curate --list
+```
+
+2. Evaluate each memory for:
+   - **Usefulness**: Is this actionable knowledge or just meta/debug info?
+   - **Duplication**: Is this already covered by CLAUDE.md or another memory?
+   - **Quality**: Is it complete, clear, and well-formed?
+   - **Relevance**: Would this help with future development work?
+
+3. Apply decisions (DELETE/KEEP/REWRITE):
+```bash
+python3 src/cli.py curate --apply '<JSON decisions>'
+```
+
+**DELETE these types:**
+- Meta observations about the current session
+- Debug notes and action statements
+- Status summaries
+- Duplicates of CLAUDE.md content
+- Incomplete fragments
+
+**KEEP these types:**
+- Architectural decisions with rationale
+- Bug fixes with solutions
+- Actual project context (not about MemoryLane itself)
+- Configuration knowledge
+
+Example evaluation:
+- ❌ "Based on git status, here's the current status..." → DELETE (status summary)
+- ❌ "Let me check the debug log..." → DELETE (debug action)
+- ❌ "The Stop hook only triggers when..." → DELETE if in CLAUDE.md
+- ✅ "stdio:ignore hiding Python errors - fixed by capturing stderr" → KEEP (bug fix)
+- ✅ "Chose Unix sockets over HTTP for 10x lower latency" → KEEP (decision)
 
 ## Learning Commands
 
@@ -221,6 +328,9 @@ Key settings in `.memorylane/config.json`:
 
 - `memory.max_context_tokens`: Target token count for compression (default: 2000)
 - `memory.compression_ratio_target`: Target compression ratio (default: 7.0x)
+- `context_rot.model_context_tokens`: Advertised model window for context rot guard (default: 200000)
+- `context_rot.safe_fraction`: Fraction of model window allowed for prompt + injected context (default: 0.5)
+- `context_rot.reserve_tokens`: Buffer reserved for assistant response (default: 1200)
 - `learning.watch_file_changes`: Enable file watching (default: true)
 - `learning.watch_git_commits`: Learn from commits (default: true)
 - `privacy.exclude_patterns`: Files to ignore (default: *.env, secrets/, etc.)

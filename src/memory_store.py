@@ -79,6 +79,14 @@ class MemoryStore:
             }
         }
 
+    # Readable prefixes for memory IDs
+    ID_PREFIXES = {
+        'patterns': 'pattern',
+        'insights': 'insight',
+        'learnings': 'learn',
+        'context': 'context'
+    }
+
     def add_memory(
         self,
         category: str,
@@ -93,9 +101,23 @@ class MemoryStore:
         if category not in memory_data['categories']:
             raise ValueError(f"Invalid category: {category}")
 
-        # Generate unique ID
-        category_short = category[:4]
-        memory_id = f"{category_short}-{len(memory_data['categories'][category]) + 1:03d}"
+        # Generate unique ID using persistent counter (never reuses IDs)
+        prefix = self.ID_PREFIXES.get(category, category[:4])
+        id_counters = memory_data['metadata'].setdefault('id_counters', {})
+
+        # If no counter exists, scan existing IDs to find highest number
+        if category not in id_counters:
+            max_id = 0
+            for mem in memory_data['categories'][category]:
+                # Parse ID number from formats like "lear-008" or "learn-008"
+                parts = mem['id'].rsplit('-', 1)
+                if len(parts) == 2 and parts[1].isdigit():
+                    max_id = max(max_id, int(parts[1]))
+            id_counters[category] = max_id
+
+        next_id = id_counters[category] + 1
+        id_counters[category] = next_id
+        memory_id = f"{prefix}-{next_id:03d}"
 
         # Create memory entry
         memory = Memory(
@@ -275,3 +297,103 @@ class MemoryStore:
 
         # Restore from backup
         self.save(memory_data)
+
+    def get_memory_by_id(self, memory_id: str) -> Optional[Dict]:
+        """
+        Get a single memory by its ID.
+
+        Args:
+            memory_id: The memory ID (e.g., "patt-001")
+
+        Returns:
+            Memory dict if found, None otherwise
+        """
+        memory_data = self.load()
+        for category in memory_data['categories'].values():
+            for memory in category:
+                if memory['id'] == memory_id:
+                    return memory
+        return None
+
+    def delete_memory(self, memory_id: str) -> bool:
+        """
+        Delete a memory by its ID.
+
+        Args:
+            memory_id: The memory ID to delete
+
+        Returns:
+            True if found and deleted, False otherwise
+        """
+        memory_data = self.load()
+
+        for category_name, memories in memory_data['categories'].items():
+            for i, memory in enumerate(memories):
+                if memory['id'] == memory_id:
+                    del memories[i]
+                    memory_data['metadata']['total_memories'] -= 1
+                    self.save(memory_data)
+                    return True
+
+        return False
+
+    def update_memory(
+        self,
+        memory_id: str,
+        content: Optional[str] = None,
+        relevance_score: Optional[float] = None,
+        metadata: Optional[Dict] = None
+    ) -> bool:
+        """
+        Update a memory's content and/or metadata.
+
+        Args:
+            memory_id: The memory ID to update
+            content: New content (optional)
+            relevance_score: New relevance score (optional)
+            metadata: Metadata to merge (optional)
+
+        Returns:
+            True if found and updated, False otherwise
+        """
+        memory_data = self.load()
+
+        for category in memory_data['categories'].values():
+            for memory in category:
+                if memory['id'] == memory_id:
+                    if content is not None:
+                        memory['content'] = content
+                    if relevance_score is not None:
+                        memory['relevance_score'] = relevance_score
+                    if metadata is not None:
+                        memory['metadata'].update(metadata)
+                    memory['last_updated'] = datetime.now().isoformat()
+                    self.save(memory_data)
+                    return True
+
+        return False
+
+    def get_uncurated_memories(
+        self,
+        curated_ids: set,
+        limit: int = 20
+    ) -> List[Dict]:
+        """
+        Get memories that haven't been curated yet.
+
+        Args:
+            curated_ids: Set of already-curated memory IDs
+            limit: Maximum number of memories to return
+
+        Returns:
+            List of uncurated memories, oldest first
+        """
+        all_memories = self.get_memories()
+
+        # Filter out already-curated memories
+        uncurated = [m for m in all_memories if m['id'] not in curated_ids]
+
+        # Sort by timestamp (oldest first) to review older memories first
+        uncurated.sort(key=lambda m: m['timestamp'])
+
+        return uncurated[:limit]

@@ -24,10 +24,10 @@ class MemoryLaneServer:
     Communicates via Unix socket for low-latency IPC
     """
 
-    def __init__(self, config: ConfigManager):
+    def __init__(self, config: ConfigManager, socket_path: Optional[str] = None):
         self.config = config
         self.store = MemoryStore(str(config.get_path('memories_file')))
-        self.socket_path = "/tmp/memorylane.sock"
+        self.socket_path = socket_path or "/tmp/memorylane.sock"
         self.pid_file = config.get_path('memory_dir') / "server.pid"
         self.running = False
         self.server_socket = None
@@ -369,17 +369,22 @@ def main():
         choices=['start', 'stop', 'status'],
         help='Server command'
     )
+    parser.add_argument(
+        '--socket',
+        default='/tmp/memorylane.sock',
+        help='Unix socket path (default: /tmp/memorylane.sock)'
+    )
 
     args = parser.parse_args()
 
     config = ConfigManager()
 
     if args.command == 'start':
-        server = MemoryLaneServer(config)
+        server = MemoryLaneServer(config, socket_path=args.socket)
         server.start()
 
     elif args.command == 'stop':
-        client = MemoryLaneClient()
+        client = MemoryLaneClient(socket_path=args.socket)
         try:
             client.shutdown()
             print("✓ Server stopped")
@@ -388,10 +393,11 @@ def main():
             sys.exit(1)
 
     elif args.command == 'status':
-        client = MemoryLaneClient()
+        client = MemoryLaneClient(socket_path=args.socket)
         if client.ping():
             stats = client.get_stats()
             print("✓ Server is running")
+            print(f"  Socket: {args.socket}")
             print(f"  Requests handled: {stats['server']['requests_handled']}")
             print(f"  Errors: {stats['server']['errors']}")
             print(f"  Total memories: {stats['memory']['total_memories']}")

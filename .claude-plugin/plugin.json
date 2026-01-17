@@ -1,0 +1,13 @@
+{
+  "name": "memorylane",
+  "version": "0.1.0",
+  "description": "Zero-config persistent memory for Claude Code with automatic cost savings",
+  "author": {
+    "name": "MemoryLane Team",
+    "url": "https://github.com/yourusername"
+  },
+  "homepage": "https://github.com/yourusername/memorylane",
+  "skills": [
+    "./skills/memorylane"
+  ]
+}

@@ -24,6 +24,13 @@ class ConfigManager:
             "enable_passive_learning": True,
             "update_frequency_seconds": 30
         },
+        "context_rot": {
+            "enabled": True,
+            "model_context_tokens": 200000,
+            "safe_fraction": 0.5,
+            "reserve_tokens": 1200,
+            "min_injection_tokens": 200
+        },
         "learning": {
             "watch_file_changes": True,
             "watch_git_commits": True,
@@ -31,6 +38,24 @@ class ConfigManager:
             "index_on_startup": True,
             "incremental_updates": True,
             "surprise_threshold": 0.6
+        },
+        "summarizer": {
+            "enabled": True,
+            "model": "SmolLM-360M-Instruct",
+            "fallback_models": [
+                "SmolLM-1.7B-Instruct",
+                "Qwen2-0.5B-Instruct"
+            ],
+            "auto_summarize": False,
+            "min_session_length": 500,
+            "batch_processing": True,
+            "confidence_threshold": 0.7,
+            "max_input_tokens": 4096,
+            "max_new_tokens": 512,
+            "temperature": 0.2,
+            "top_p": 0.9,
+            "do_sample": False,
+            "allow_download": True
         },
         "compression": {
             "target_ratio": 7.0,
@@ -87,6 +112,11 @@ class ConfigManager:
             "auto_context_injection": True,
             "git_integration": True,
             "terminal_integration": False
+        },
+        "curation": {
+            "enabled": False,
+            "trigger_memory_count": 15,
+            "max_memories_per_review": 20
         }
     }
 

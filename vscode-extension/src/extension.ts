@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { SidecarManager } from './sidecar';
 import { StatusBarManager } from './statusBar';
+import { OverviewTreeProvider } from './overviewTree';
 import { MemoryTreeProvider } from './memoryTree';
 import { InsightsTreeProvider } from './insightsTree';
 import { SavingsTreeProvider } from './savingsTree';
@@ -20,10 +21,12 @@ export async function activate(context: vscode.ExtensionContext) {
     interactionTracker = new InteractionTracker(sidecarManager);
 
     // Register tree data providers
+    const overviewTreeProvider = new OverviewTreeProvider(sidecarManager);
     const memoryTreeProvider = new MemoryTreeProvider(sidecarManager);
     const insightsTreeProvider = new InsightsTreeProvider(sidecarManager);
     const savingsTreeProvider = new SavingsTreeProvider(sidecarManager);
 
+    vscode.window.registerTreeDataProvider('memorylane.overview', overviewTreeProvider);
     vscode.window.registerTreeDataProvider('memorylane.memories', memoryTreeProvider);
     vscode.window.registerTreeDataProvider('memorylane.insights', insightsTreeProvider);
     vscode.window.registerTreeDataProvider('memorylane.savings', savingsTreeProvider);
@@ -31,7 +34,13 @@ export async function activate(context: vscode.ExtensionContext) {
     // Auto-start sidecar if configured
     const config = vscode.workspace.getConfiguration('memorylane');
     if (config.get('autoStart', true)) {
-        await sidecarManager.start();
+        try {
+            await sidecarManager.start();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`MemoryLane: ${message}`);
+            console.error('MemoryLane sidecar start failed:', error);
+        }
     }
 
     // Start interaction tracking
@@ -87,6 +96,10 @@ export async function activate(context: vscode.ExtensionContext) {
 
         vscode.commands.registerCommand('memorylane.showKnowledgeGraph', () => {
             KnowledgeGraphPanel.createOrShow(context.extensionUri, sidecarManager);
+        }),
+
+        vscode.commands.registerCommand('memorylane.toggleScope', () => {
+            overviewTreeProvider.toggleScope();
         }),
 
         vscode.commands.registerCommand('memorylane.startLearning', async () => {

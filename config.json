@@ -8,6 +8,14 @@
     "update_frequency_seconds": 30
   },
 
+  "context_rot": {
+    "enabled": true,
+    "model_context_tokens": 200000,
+    "safe_fraction": 0.5,
+    "reserve_tokens": 1200,
+    "min_injection_tokens": 200
+  },
+
   "learning": {
     "watch_file_changes": true,
     "watch_git_commits": true,
@@ -15,6 +23,25 @@
     "index_on_startup": true,
     "incremental_updates": true,
     "surprise_threshold": 0.6
+  },
+
+  "summarizer": {
+    "enabled": true,
+    "model": "SmolLM-360M-Instruct",
+    "fallback_models": [
+      "SmolLM-1.7B-Instruct",
+      "Qwen2-0.5B-Instruct"
+    ],
+    "auto_summarize": false,
+    "min_session_length": 500,
+    "batch_processing": true,
+    "confidence_threshold": 0.7,
+    "max_input_tokens": 4096,
+    "max_new_tokens": 512,
+    "temperature": 0.2,
+    "top_p": 0.9,
+    "do_sample": false,
+    "allow_download": true
   },
 
   "compression": {

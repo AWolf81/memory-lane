@@ -45,6 +45,9 @@ htmlcov/
 .memorylane/
 !.memorylane/.gitignore
 
+# Test workspace for extension development
+.test-workspace/
+
 # Logs
 *.log
 logs/

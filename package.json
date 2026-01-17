@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Zero-config persistent memory for Claude with automatic cost savings",
   "main": "src/server.py",
+  "engines": {
+    "vscode": "^1.80.0"
+  },
   "scripts": {
     "install": "bash install.sh",
     "status": "python3 src/cli.py status",
