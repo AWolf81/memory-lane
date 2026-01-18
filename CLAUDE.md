@@ -34,10 +34,12 @@ docs/                   # Documentation and decision records
 | `src/learner.py` | Passive learning from git/files |
 | `src/compressor.py` | Context compression engine |
 | `src/semantic_search.py` | Optional semantic similarity search |
-| `src/conversation_learner.py` | Extracts memories from conversations |
+| `src/conversation_learner.py` | Extracts memories from conversations (regex fallback) |
+| `src/claude_extractor.py` | Claude-powered knowledge extraction with trigger-specific prompts |
+| `src/learning_prompts.py` | Specialized prompts for different learning triggers |
 | `.claude/hooks/inject-context.py` | UserPromptSubmit: inject context before prompts |
 | `.claude/hooks/realtime-learn.py` | PostToolUse: learn from errors/fixes as they happen |
-| `.claude/hooks/capture-learnings.py` | Stop: extract learnings from full transcript |
+| `.claude/hooks/capture-learnings.py` | Stop: extract learnings using Claude (regex fallback) |
 
 ## Commands
 
@@ -127,8 +129,9 @@ MemoryLane uses Claude Code hooks to automatically inject relevant context into 
 │                                                    │                 │
 │                                                    ▼                 │
 │                                          capture-learnings.py        │
-│                                          - Parse full transcript     │
-│                                          - Extract remaining insights│
+│                                          - Claude-powered extraction │
+│                                          - Trigger-specific prompts  │
+│                                          - Fallback: regex patterns  │
 │                                                    │                 │
 │                                                    ▼                 │
 │  ┌──────────────────────────────────────────────────────────────┐   │
@@ -148,11 +151,16 @@ MemoryLane automatically learns from conversations via three mechanisms:
 ```
 Captures: errors, fixes, successful test runs, new config files
 
-**2. Session End Learning (Stop)** - Extracts from full transcript
+**2. Session End Learning (Stop)** - Claude-powered extraction from full transcript
 ```json
 "Stop": [{"hooks": [...capture-learnings.py]}]
 ```
-Captures: architectural decisions, patterns, insights missed by real-time
+Uses Claude with trigger-specific prompts to extract:
+- Completed features and what was built
+- Design decisions and rationale
+- Patterns used and conventions established
+- Gotchas and non-obvious discoveries
+Falls back to regex patterns if Claude unavailable
 
 **3. Manual Learning** - Extract insights from text or transcripts
 ```bash
@@ -172,8 +180,33 @@ echo "We use Unix sockets for lower latency" | python3 src/cli.py learn
 - Configuration knowledge ("config at...", "file location...")
 - Code patterns ("pattern:", "always/never when...")
 
+## Claude-Powered Extraction
+
+MemoryLane uses Claude to analyze sessions with trigger-specific prompts for high-quality extraction:
+
+| Trigger | When Used | Extraction Focus |
+|---------|-----------|------------------|
+| `session_end` | Stop hook, full transcript | All valuable insights (3-10 memories) |
+| `task_completion` | Task done, feature complete | What was built, key decisions, integration points |
+| `error_resolution` | Error fixed | Root cause, fix, prevention |
+| `feature_implementation` | New feature added | Architecture, rationale, edge cases |
+| `debugging` | Investigation session | Symptoms, diagnostics, root cause |
+| `refactor` | Code restructured | Before/after patterns, motivation |
+
+**Extraction backend priority:**
+1. Claude CLI (`claude --print`) - uses existing auth
+2. Anthropic API (`ANTHROPIC_API_KEY`) - direct API
+3. Local LLM (SmolLM/Qwen) - privacy-first fallback
+4. Regex heuristics - zero-dependency fallback
+
+**New files:**
+- `src/learning_prompts.py` - Trigger-specific system prompts
+- `src/claude_extractor.py` - Claude extraction with fallback chain
+
 ## Architecture Decisions
 
+- **Claude-first extraction**: Higher quality knowledge extraction
+- **Trigger-specific prompts**: Different contexts need different extraction strategies
 - **Unix sockets over HTTP**: Lower latency for IPC
 - **JSON over SQLite**: Simpler for MVP
 - **pip over Poetry**: Zero production dependencies

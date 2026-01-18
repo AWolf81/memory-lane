@@ -1,0 +1,35 @@
+{
+	"nodes":[
+		{"id":"claude-extractor","type":"text","text":"Claude Extraction\nTrigger-specific prompts\n(session_end, task_completion, error_resolution, etc.)","x":260,"y":-280,"width":300,"height":120},
+		{"id":"summarizer","type":"text","text":"Summarization Orchestrator\nExtracts decisions & insights\n(fallback mode available)","x":260,"y":-100,"width":300,"height":100},
+		{"id":"memory","type":"text","text":"Memory Store\nStructured memories\nPatterns, decisions, learnings","x":260,"y":60,"width":300,"height":100},
+		{"id":"compressor","type":"text","text":"Context Compressor\nRanks + deduplicates\nToken budget enforcement","x":260,"y":240,"width":300,"height":140},
+		{"id":"model","type":"text","text":"Local LLM Models (fallback)\nSmolLM / Qwen\nCPU-only, privacy-first","x":635,"y":-100,"width":280,"height":100},
+		{"id":"1eb8d51294728380","type":"text","text":"Regex Heuristics\n(final fallback)","x":635,"y":20,"width":250,"height":60},
+		{"id":"8934c406aad2dcd4","type":"text","text":"VS Code Extension\nMemory access through sidecar","x":980,"y":60,"width":250,"height":100},
+		{"id":"sidecar","type":"text","text":"Sidecar Server\nUnix socket IPC\nAsync background jobs","x":653,"y":150,"width":245,"height":120},
+		{"id":"cli","type":"text","text":"CLI\nUser interaction layer\nTriggers extraction + recall","x":-100,"y":50,"width":260,"height":120},
+		{"id":"a05fe5630dcbc0ce","type":"text","text":"Session Sources\n- Claude transcript\n- Git diff / commits\n- Changed files\n- Terminal logs (optional)","x":-520,"y":3,"width":362,"height":214},
+		{"id":"claude-api","type":"text","text":"Claude CLI / API\n(primary extractor)","x":635,"y":-280,"width":280,"height":80},
+		{"id":"learning-prompts","type":"text","text":"Learning Prompts\n- session_end\n- task_completion\n- error_resolution\n- feature_implementation\n- debugging\n- refactor","x":260,"y":-480,"width":300,"height":160}
+	],
+	"edges":[
+		{"id":"3937849f1c3faf31","fromNode":"summarizer","fromSide":"bottom","toNode":"memory","toSide":"top"},
+		{"id":"6bac7b87bc647883","fromNode":"compressor","fromSide":"left","toNode":"cli","toSide":"bottom"},
+		{"id":"1a2dee9bf163579a","fromNode":"memory","fromSide":"bottom","toNode":"compressor","toSide":"top"},
+		{"id":"9f7aef14cb92ea64","fromNode":"cli","fromSide":"right","toNode":"memory","toSide":"left"},
+		{"id":"a40ed40627441cbf","fromNode":"memory","fromSide":"left","toNode":"cli","toSide":"right"},
+		{"id":"5dcff26c442d94e7","fromNode":"summarizer","fromSide":"right","toNode":"model","toSide":"left","label":"fallback"},
+		{"id":"c8b7434845eb6ee4","fromNode":"model","fromSide":"bottom","toNode":"1eb8d51294728380","toSide":"top","label":"fallback"},
+		{"id":"3e8ad3ee6f6d3a6f","fromNode":"cli","fromSide":"top","toNode":"summarizer","toSide":"left"},
+		{"id":"ad2c004ccd9a96c1","fromNode":"summarizer","fromSide":"left","toNode":"cli","toSide":"top"},
+		{"id":"ed872fd53feb8bba","fromNode":"memory","fromSide":"right","toNode":"sidecar","toSide":"left"},
+		{"id":"c687b0ac28964074","fromNode":"sidecar","fromSide":"right","toNode":"8934c406aad2dcd4","toSide":"left"},
+		{"id":"99e2a67303faefd8","fromNode":"8934c406aad2dcd4","fromSide":"left","toNode":"sidecar","toSide":"right"},
+		{"id":"9492e9d50aea449b","fromNode":"sidecar","fromSide":"left","toNode":"memory","toSide":"right"},
+		{"id":"22c324468514151f","fromNode":"a05fe5630dcbc0ce","fromSide":"right","toNode":"cli","toSide":"left"},
+		{"id":"claude-to-extractor","fromNode":"claude-api","fromSide":"left","toNode":"claude-extractor","toSide":"right"},
+		{"id":"extractor-to-summarizer","fromNode":"claude-extractor","fromSide":"bottom","toNode":"summarizer","toSide":"top"},
+		{"id":"prompts-to-extractor","fromNode":"learning-prompts","fromSide":"bottom","toNode":"claude-extractor","toSide":"top"}
+	]
+}

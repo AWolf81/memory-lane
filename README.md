@@ -1,8 +1,23 @@
 # MemoryLane 🧠
 
+> **Note:** "MemoryLane" is a working title. The name may change before v1.0. Name suggestions welcome!
+
 **Local-first persistent memory for Claude Code with automatic cost savings**
 
 MemoryLane gives Claude Code durable project memory by extracting knowledge locally and injecting only what matters. It reduces token usage by **up to 84%**, eliminates repeated explanations, and keeps raw development sessions on your machine.
+
+---
+
+## ⚠️ Alpha Software
+
+**This is a proof of concept and alpha-stage software.**
+
+- Not tested in production environments
+- Memory quality and cost savings claims need real-world verification
+- API and configuration may change without notice
+- Use at your own risk
+
+We welcome feedback, bug reports, and contributions to help mature this project.
 
 ---
 
@@ -21,9 +36,9 @@ Only intentional, compressed context is sent to the cloud.**
 - **💰 Massive Cost Savings**  
   **30–84% token reduction** through intelligent summarization and compression.
 
-- **🧠 Local LLM Summarization**  
-  Uses a local, instruction-tuned LLM (hundreds of millions to low-single-digit billions of parameters) to extract design decisions, problems solved, and patterns.  
-  Heuristic fallback is used if the model is unavailable.
+- **🧠 Claude-Powered Extraction**
+  Uses Claude (via CLI or API) with trigger-specific prompts to extract design decisions, solutions, patterns, and architectural insights.
+  Falls back to local LLM or regex heuristics when Claude is unavailable.
 
 - **🔒 Privacy-First by Design**  
   Raw transcripts, diffs, and files stay local. Only curated context reaches Claude.
@@ -103,11 +118,40 @@ pytest tests/test_cost_savings.py -v -s
 
 MemoryLane is local-first and session-aware:
 
-* CLI captures session sources (transcripts, git diffs, file changes)
-* A summarization orchestrator extracts durable knowledge
-* A **local LLM backend** is used by default, with heuristic fallback
-* Structured memory is stored locally
-* Context is recalled, compressed, and injected on demand
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           MEMORYLANE ARCHITECTURE                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  Learning Prompts ──────▶ Claude Extraction ◀────── Claude CLI / API        │
+│  (trigger-specific)       (primary extractor)        (session_end,          │
+│                                   │                   task_completion,       │
+│                                   │                   error_resolution...)   │
+│                                   ▼                                          │
+│  Session Sources ──────▶ Summarization Orchestrator                         │
+│  - Claude transcripts            │         │                                 │
+│  - Git diffs/commits             │         ▼ fallback                       │
+│  - File changes                  │    Local LLM (SmolLM/Qwen)               │
+│                                  │         │                                 │
+│                                  │         ▼ fallback                       │
+│                                  │    Regex Heuristics                      │
+│                                  │                                           │
+│       CLI ◀──────────────────────┴───────────────────▶ Memory Store         │
+│       │                                                patterns | insights   │
+│       │                                                learnings | context   │
+│       │                                                     │                │
+│       ▼                                                     ▼                │
+│  Context Compressor ◀──────────────────────────────────────┘                │
+│  (rank + dedupe + budget)                                                    │
+│       │                                                                      │
+│       ├─────────────▶ Sidecar Server ◀────────▶ VS Code Extension           │
+│       │               (Unix socket IPC)                                      │
+│       ▼                                                                      │
+│  Context Injection ──▶ Claude Code                                          │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+See [docs/architecture.canvas](docs/architecture.canvas) for the Obsidian visual diagram.
 
 Only **intentional, compressed context** is sent to Claude Code.
 
@@ -119,10 +163,10 @@ Only **intentional, compressed context** is sent to Claude Code.
    CLI collects transcripts, git diffs, and workspace changes.
 
 2. **Knowledge Extraction**
-   A local LLM summarizes decisions, problems, and patterns.
+   Claude analyzes the session using trigger-specific prompts (session_end, task_completion, error_resolution, etc.) to extract valuable insights. Falls back to local LLM or regex heuristics when unavailable.
 
 3. **Structured Memory**
-   Knowledge is stored as durable, queryable memories.
+   Knowledge is stored as durable, queryable memories in four categories: patterns, insights, learnings, context.
 
 4. **Recall & Compression**
    Relevant memories are ranked, deduplicated, and token-budgeted.

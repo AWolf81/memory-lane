@@ -8,6 +8,23 @@ import os
 from pathlib import Path
 from typing import Dict, Any, Optional
 
+from constants import (
+    CLAUDE_DEFAULT_MODEL,
+    CLAUDE_MAX_TOKENS,
+    CLAUDE_TIMEOUT,
+    LOCAL_LLM_DEFAULT,
+    LOCAL_LLM_MODELS,
+    DEFAULT_MAX_CONTEXT_TOKENS,
+    DEFAULT_COMPRESSION_RATIO,
+    DEFAULT_RELEVANCE_THRESHOLD,
+    CONFIDENCE_THRESHOLD,
+    CONTEXT_ROT_MODEL_TOKENS,
+    CONTEXT_ROT_SAFE_FRACTION,
+    CONTEXT_ROT_RESERVE_TOKENS,
+    CONTEXT_ROT_MIN_INJECTION,
+    EXTRACTION_DEFAULT_BACKEND,
+)
+
 
 class ConfigManager:
     """
@@ -17,19 +34,19 @@ class ConfigManager:
 
     DEFAULT_CONFIG = {
         "memory": {
-            "max_context_tokens": 2000,
-            "compression_ratio_target": 7.0,
+            "max_context_tokens": DEFAULT_MAX_CONTEXT_TOKENS,
+            "compression_ratio_target": DEFAULT_COMPRESSION_RATIO,
             "max_memories_per_category": 150,
-            "relevance_threshold": 0.7,
+            "relevance_threshold": DEFAULT_RELEVANCE_THRESHOLD,
             "enable_passive_learning": True,
             "update_frequency_seconds": 30
         },
         "context_rot": {
             "enabled": True,
-            "model_context_tokens": 200000,
-            "safe_fraction": 0.5,
-            "reserve_tokens": 1200,
-            "min_injection_tokens": 200
+            "model_context_tokens": CONTEXT_ROT_MODEL_TOKENS,
+            "safe_fraction": CONTEXT_ROT_SAFE_FRACTION,
+            "reserve_tokens": CONTEXT_ROT_RESERVE_TOKENS,
+            "min_injection_tokens": CONTEXT_ROT_MIN_INJECTION
         },
         "learning": {
             "watch_file_changes": True,
@@ -39,17 +56,20 @@ class ConfigManager:
             "incremental_updates": True,
             "surprise_threshold": 0.6
         },
+        "extraction": {
+            "backend": EXTRACTION_DEFAULT_BACKEND,  # "auto", "claude", "local_llm", "regex"
+            "claude_model": CLAUDE_DEFAULT_MODEL,
+            "claude_max_tokens": CLAUDE_MAX_TOKENS,
+            "claude_timeout": CLAUDE_TIMEOUT
+        },
         "summarizer": {
             "enabled": True,
-            "model": "SmolLM-360M-Instruct",
-            "fallback_models": [
-                "SmolLM-1.7B-Instruct",
-                "Qwen2-0.5B-Instruct"
-            ],
+            "model": LOCAL_LLM_DEFAULT,
+            "fallback_models": LOCAL_LLM_MODELS[1:],  # Skip first (default)
             "auto_summarize": False,
             "min_session_length": 500,
             "batch_processing": True,
-            "confidence_threshold": 0.7,
+            "confidence_threshold": CONFIDENCE_THRESHOLD,
             "max_input_tokens": 4096,
             "max_new_tokens": 512,
             "temperature": 0.2,

@@ -44,7 +44,7 @@ class TestMemoryStore:
             relevance_score=0.9
         )
 
-        assert memory_id.startswith('patt-')
+        assert memory_id.startswith('pattern-')
 
         # Verify it was saved
         data = temp_store.load()
