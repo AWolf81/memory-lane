@@ -28,26 +28,27 @@ jobs:
 
       - name: Run tests (excluding local-only)
         run: |
-          pytest tests/ -v --tb=short -m "not local_only"
+          pytest tests/ -v --tb=short -m "not local_only" --cov=src --cov-report=xml --junitxml=junit.xml -o junit_family=legacy
         env:
           # Signal to tests that we're running in CI
           CI: true
           GITHUB_ACTIONS: true
 
-      - name: Check test coverage
-        run: |
-          pytest tests/ -v --cov=src --cov-report=xml --cov-report=term-missing -m "not local_only"
-        if: matrix.python-version == '3.12'
-
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
-        if: matrix.python-version == '3.12'
+        if: ${{ !cancelled() }}
         with:
           files: ./coverage.xml
           fail_ci_if_error: false
           verbose: true
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Upload test results to Codecov
+        uses: codecov/test-results-action@v1
+        if: ${{ !cancelled() }}
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
 
   lint:
     runs-on: ubuntu-latest
