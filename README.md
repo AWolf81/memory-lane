@@ -63,14 +63,14 @@ Only intentional, compressed context is sent to the cloud.**
 
 ```bash
 # Install the Claude Code skill from GitHub
-claude skill install yourusername/memorylane --skill memorylane
+claude skill install AWolf81/memory-lane --skill memorylane
 
 # Or install via marketplace alias (one-time add, then install)
-claude plugin marketplace add yourusername/memorylane
+claude plugin marketplace add AWolf81/memory-lane
 claude plugin install memorylane@memorylane
 
 # Or manual installation
-git clone https://github.com/yourusername/memorylane.git
+git clone https://github.com/AWolf81/memory-lane.git
 cd memorylane
 bash install.sh
 ````
@@ -123,10 +123,9 @@ MemoryLane is local-first and session-aware:
 │                           MEMORYLANE ARCHITECTURE                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│  Learning Prompts ──────▶ Claude Extraction ◀────── Claude CLI / API        │
-│  (trigger-specific)       (primary extractor)        (session_end,          │
-│                                   │                   task_completion,       │
-│                                   │                   error_resolution...)   │
+│  Learning Prompts ──────▶ Claude Extraction                                  │
+│  (trigger-specific)       (primary extractor)                                │
+│                                   │                                          │
 │                                   ▼                                          │
 │  Session Sources ──────▶ Summarization Orchestrator                         │
 │  - Claude transcripts            │         │                                 │

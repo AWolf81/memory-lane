@@ -2,7 +2,7 @@
   "name": "memorylane",
   "owner": {
     "name": "MemoryLane Team",
-    "url": "https://github.com/yourusername"
+    "url": "https://github.com/AWolf81"
   },
   "plugins": [
     {
@@ -10,7 +10,7 @@
       "description": "Zero-config persistent memory for Claude Code with automatic cost savings",
       "source": {
         "source": "github",
-        "repo": "yourusername/memorylane"
+        "repo": "AWolf81/memory-lane"
       },
       "category": "productivity",
       "tags": [

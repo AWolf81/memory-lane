@@ -4,9 +4,9 @@
   "description": "Zero-config persistent memory for Claude Code with automatic cost savings",
   "author": {
     "name": "MemoryLane Team",
-    "url": "https://github.com/yourusername"
+    "url": "https://github.com/AWolf81"
   },
-  "homepage": "https://github.com/yourusername/memorylane",
+  "homepage": "https://github.com/AWolf81/memory-lane",
   "skills": [
     "./skills/memorylane"
   ]

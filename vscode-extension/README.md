@@ -283,7 +283,7 @@ MIT License - see LICENSE file for details
 
 ## Support
 
-- GitHub Issues: https://github.com/yourusername/memorylane/issues
+- GitHub Issues: https://github.com/AWolf81/memory-lane/issues
 - Documentation: https://memorylane.dev/docs
 - Discord: https://discord.gg/memorylane
 
