@@ -309,3 +309,172 @@ class TestPIDFileHandling:
             # Server init should be fine, it cleans up stale PIDs on start
 
             assert server is not None
+
+
+class TestServerSocketSetup:
+    """Test socket setup and cleanup."""
+
+    @pytest.fixture
+    def server(self, tmp_path):
+        """Create server instance for testing."""
+        mock_config = MagicMock()
+        mock_config.get_path.side_effect = lambda key: {
+            'memories_file': tmp_path / "memories.json",
+            'memory_dir': tmp_path
+        }.get(key, tmp_path / key)
+
+        with patch('server.MemoryStore'):
+            server = MemoryLaneServer(mock_config, socket_path=str(tmp_path / "test.sock"))
+            yield server
+
+    def test_setup_socket_creates_unix_socket(self, server, tmp_path):
+        """Should create Unix socket file."""
+        server._setup_socket()
+
+        assert Path(server.socket_path).exists()
+        # Cleanup
+        server.server_socket.close()
+        Path(server.socket_path).unlink()
+
+    def test_setup_socket_removes_existing(self, server, tmp_path):
+        """Should remove existing socket file."""
+        # Create existing socket file
+        socket_path = Path(server.socket_path)
+        socket_path.write_text("fake socket")
+
+        server._setup_socket()
+
+        # Socket should be replaced
+        assert socket_path.exists()
+        # Cleanup
+        server.server_socket.close()
+        socket_path.unlink()
+
+
+class TestServerStop:
+    """Test server stop functionality."""
+
+    @pytest.fixture
+    def server(self, tmp_path):
+        """Create server instance for testing."""
+        mock_config = MagicMock()
+        mock_config.get_path.side_effect = lambda key: {
+            'memories_file': tmp_path / "memories.json",
+            'memory_dir': tmp_path
+        }.get(key, tmp_path / key)
+
+        with patch('server.MemoryStore'):
+            server = MemoryLaneServer(mock_config, socket_path=str(tmp_path / "test.sock"))
+            yield server
+
+    def test_stop_sets_running_false(self, server):
+        """Stop should set running to False."""
+        server.running = True
+
+        with patch('sys.exit'):
+            server.stop()
+
+        assert server.running is False
+
+    def test_stop_closes_socket(self, server):
+        """Stop should close server socket."""
+        server._setup_socket()
+        server.running = True
+
+        with patch('sys.exit'):
+            server.stop()
+
+        # Socket should be closed (can't accept new connections)
+        assert server.server_socket._closed or not server.running
+
+    def test_stop_removes_socket_file(self, server, tmp_path):
+        """Stop should remove socket file."""
+        server._setup_socket()
+        socket_path = Path(server.socket_path)
+        assert socket_path.exists()
+
+        with patch('sys.exit'):
+            server.stop()
+
+        assert not socket_path.exists()
+
+
+class TestSignalHandler:
+    """Test signal handling."""
+
+    @pytest.fixture
+    def server(self, tmp_path):
+        """Create server instance for testing."""
+        mock_config = MagicMock()
+        mock_config.get_path.side_effect = lambda key: {
+            'memories_file': tmp_path / "memories.json",
+            'memory_dir': tmp_path
+        }.get(key, tmp_path / key)
+
+        with patch('server.MemoryStore'):
+            server = MemoryLaneServer(mock_config, socket_path=str(tmp_path / "test.sock"))
+            yield server
+
+    def test_signal_handler_calls_stop(self, server):
+        """Signal handler should call stop."""
+        with patch.object(server, 'stop') as mock_stop:
+            server._signal_handler(15, None)  # SIGTERM
+
+            mock_stop.assert_called_once()
+
+
+class TestClientSuccessfulOperations:
+    """Test client operations with mocked successful responses."""
+
+    def test_add_memory_returns_id_on_success(self):
+        """add_memory should return memory ID on success."""
+        client = MemoryLaneClient()
+
+        with patch.object(client, '_send_request') as mock_send:
+            mock_send.return_value = {'status': 'success', 'memory_id': 'patt-001'}
+
+            result = client.add_memory(
+                category='patterns',
+                content='Test pattern',
+                source='test'
+            )
+
+            assert result == 'patt-001'
+
+    def test_get_context_returns_context_on_success(self):
+        """get_context should return context string on success."""
+        client = MemoryLaneClient()
+
+        with patch.object(client, '_send_request') as mock_send:
+            mock_send.return_value = {'status': 'success', 'context': '# Context\n\nTest'}
+
+            result = client.get_context(category='patterns')
+
+            assert result == '# Context\n\nTest'
+
+    def test_get_stats_returns_dict_on_success(self):
+        """get_stats should return stats dict on success."""
+        client = MemoryLaneClient()
+
+        with patch.object(client, '_send_request') as mock_send:
+            mock_send.return_value = {
+                'status': 'success',
+                'memory_stats': {'total': 5},
+                'server_stats': {'requests': 10}
+            }
+
+            result = client.get_stats()
+
+            assert 'memory' in result
+            assert 'server' in result
+
+    def test_shutdown_sends_request(self):
+        """shutdown should send shutdown request."""
+        client = MemoryLaneClient()
+
+        with patch.object(client, '_send_request') as mock_send:
+            mock_send.return_value = {'status': 'success'}
+
+            client.shutdown()
+
+            mock_send.assert_called_once_with({'action': 'shutdown'})

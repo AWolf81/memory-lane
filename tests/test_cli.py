@@ -371,3 +371,271 @@ class TestMemoryCommand:
 
         captured = capsys.readouterr()
         assert "Updated" in captured.out
+
+
+class TestInsightsCommand:
+    """Test the insights command."""
+
+    @pytest.fixture
+    def cli_with_insights(self, tmp_path):
+        """Create CLI with sample insights."""
+        with patch('cli.ConfigManager') as mock_config:
+            mock_config.return_value.get_path.return_value = tmp_path / "memories.json"
+
+            with patch('cli.MemoryStore') as mock_store:
+                mock_store.return_value.get_memories.return_value = [
+                    {
+                        'id': 'insi-001',
+                        'category': 'insights',
+                        'content': 'Project uses TypeScript with strict mode',
+                        'relevance_score': 0.9
+                    },
+                    {
+                        'id': 'insi-002',
+                        'category': 'insights',
+                        'content': 'Authentication uses JWT tokens',
+                        'relevance_score': 0.85
+                    }
+                ]
+
+                with patch('cli.ProjectRegistry'):
+                    with patch('cli.ensure_registered'):
+                        cli = MemoryLaneCLI(auto_register=False)
+                        yield cli
+
+    def test_insights_shows_insights(self, cli_with_insights, capsys):
+        """Insights should display learned insights."""
+        args = MagicMock()
+
+        cli_with_insights.cmd_insights(args)
+
+        captured = capsys.readouterr()
+        assert "TypeScript" in captured.out or "Insights" in captured.out
+
+    def test_insights_empty_shows_message(self, tmp_path, capsys):
+        """Should show message when no insights."""
+        with patch('cli.ConfigManager') as mock_config:
+            mock_config.return_value.get_path.return_value = tmp_path / "memories.json"
+
+            with patch('cli.MemoryStore') as mock_store:
+                mock_store.return_value.get_memories.return_value = []
+
+                with patch('cli.ProjectRegistry'):
+                    with patch('cli.ensure_registered'):
+                        cli = MemoryLaneCLI(auto_register=False)
+
+                        args = MagicMock()
+                        cli.cmd_insights(args)
+
+                        captured = capsys.readouterr()
+                        assert "No insights" in captured.out
+
+
+class TestCostsCommand:
+    """Test the costs command."""
+
+    def test_costs_no_data(self, tmp_path, capsys):
+        """Should show message when no cost data."""
+        with patch('cli.ConfigManager') as mock_config:
+            mock_config.return_value.get_path.return_value = tmp_path / "nonexistent.json"
+
+            with patch('cli.MemoryStore'):
+                with patch('cli.ProjectRegistry'):
+                    with patch('cli.ensure_registered'):
+                        cli = MemoryLaneCLI(auto_register=False)
+
+                        args = MagicMock()
+                        cli.cmd_costs(args)
+
+                        captured = capsys.readouterr()
+                        assert "No cost tracking" in captured.out
+
+    def test_costs_with_data(self, tmp_path, capsys):
+        """Should display cost breakdown when data available."""
+        with patch('cli.ConfigManager') as mock_config:
+            metrics_file = tmp_path / "metrics.json"
+            mock_config.return_value.get_path.return_value = metrics_file
+
+            metrics_data = {
+                'cost_savings': {
+                    'today': 1.50,
+                    'week': 10.50,
+                    'month': 42.00,
+                    'total': 100.00
+                },
+                'compression': {
+                    'avg_before': 2000,
+                    'avg_after': 312,
+                    'avg_ratio': 6.4,
+                    'total_saved': 50000
+                },
+                'interactions': 150
+            }
+            metrics_file.write_text(json.dumps(metrics_data))
+
+            with patch('cli.MemoryStore'):
+                with patch('cli.ProjectRegistry'):
+                    with patch('cli.ensure_registered'):
+                        cli = MemoryLaneCLI(auto_register=False)
+
+                        args = MagicMock()
+                        cli.cmd_costs(args)
+
+                        captured = capsys.readouterr()
+                        assert "Cost Savings" in captured.out
+
+
+class TestResetCommand:
+    """Test the reset command."""
+
+    @pytest.fixture
+    def cli_instance(self, tmp_path):
+        """Create CLI instance for testing."""
+        with patch('cli.ConfigManager') as mock_config:
+            mock_config.return_value.get_path.return_value = tmp_path / "memories.json"
+
+            with patch('cli.MemoryStore') as mock_store:
+                mock_store.return_value.export_backup.return_value = tmp_path / "backup.json"
+                mock_store.return_value.create_empty_memory.return_value = {}
+
+                with patch('cli.ProjectRegistry'):
+                    with patch('cli.ensure_registered'):
+                        cli = MemoryLaneCLI(auto_register=False)
+                        yield cli
+
+    def test_reset_with_force(self, cli_instance, capsys):
+        """Reset with --force should skip confirmation."""
+        args = MagicMock()
+        args.force = True
+
+        cli_instance.cmd_reset(args)
+
+        captured = capsys.readouterr()
+        assert "Backup created" in captured.out
+        assert "reset" in captured.out.lower()
+
+    def test_reset_cancelled(self, cli_instance, capsys):
+        """Reset without force should prompt for confirmation."""
+        args = MagicMock()
+        args.force = False
+
+        with patch('builtins.input', return_value='no'):
+            cli_instance.cmd_reset(args)
+
+        captured = capsys.readouterr()
+        assert "Cancelled" in captured.out
+
+
+class TestExportMarkdown:
+    """Test markdown export command."""
+
+    @pytest.fixture
+    def cli_instance(self, tmp_path):
+        """Create CLI instance for testing."""
+        with patch('cli.ConfigManager') as mock_config:
+            mock_config.return_value.get_path.return_value = tmp_path / "memories.json"
+
+            with patch('cli.MemoryStore') as mock_store:
+                mock_store.return_value.to_markdown.return_value = "# Memories\n\n- Pattern 1\n- Pattern 2"
+
+                with patch('cli.ProjectRegistry'):
+                    with patch('cli.ensure_registered'):
+                        cli = MemoryLaneCLI(auto_register=False)
+                        yield cli, tmp_path
+
+    def test_export_to_stdout(self, cli_instance, capsys):
+        """Export without output file should print to stdout."""
+        cli, tmp_path = cli_instance
+
+        args = MagicMock()
+        args.category = None
+        args.output = None
+
+        cli.cmd_export_markdown(args)
+
+        captured = capsys.readouterr()
+        assert "# Memories" in captured.out
+
+    def test_export_to_file(self, cli_instance, capsys):
+        """Export with output file should write to file."""
+        cli, tmp_path = cli_instance
+
+        output_file = tmp_path / "export.md"
+        args = MagicMock()
+        args.category = None
+        args.output = str(output_file)
+
+        cli.cmd_export_markdown(args)
+
+        captured = capsys.readouterr()
+        assert "Exported" in captured.out
+
+
+class TestContextCommand:
+    """Test context command for hook integration."""
+
+    @pytest.fixture
+    def cli_instance(self, tmp_path):
+        """Create CLI instance for testing."""
+        with patch('cli.ConfigManager') as mock_config:
+            mock_config.return_value.get_path.return_value = tmp_path / "memories.json"
+
+            with patch('cli.MemoryStore') as mock_store:
+                mock_store.return_value.get_memories.return_value = [
+                    {
+                        'id': 'patt-001',
+                        'category': 'patterns',
+                        'content': 'Use async/await for IO',
+                        'relevance_score': 0.9
+                    }
+                ]
+
+                with patch('cli.ProjectRegistry'):
+                    with patch('cli.ensure_registered'):
+                        cli = MemoryLaneCLI(auto_register=False)
+                        yield cli
+
+    def test_context_outputs_memories(self, cli_instance, capsys):
+        """Context should output formatted memories."""
+        with patch('cli.ContextCompressor') as mock_compressor:
+            mock_result = MagicMock()
+            mock_result.compressed_text = "# Context\n\n- Pattern 1"
+            mock_compressor.return_value.compress.return_value = mock_result
+
+            args = MagicMock()
+            args.query = ""
+            args.max_tokens = 2000
+            args.min_relevance = 0.3
+            args.limit = 20
+            args.all_projects = False
+            args.projects = None
+
+            cli_instance.cmd_context(args)
+
+            captured = capsys.readouterr()
+            assert "Context" in captured.out or "Pattern" in captured.out
+
+    def test_context_empty_returns_nothing(self, tmp_path, capsys):
+        """Context with no memories should output nothing."""
+        with patch('cli.ConfigManager') as mock_config:
+            mock_config.return_value.get_path.return_value = tmp_path / "memories.json"
+
+            with patch('cli.MemoryStore') as mock_store:
+                mock_store.return_value.get_memories.return_value = []
+
+                with patch('cli.ProjectRegistry'):
+                    with patch('cli.ensure_registered'):
+                        cli = MemoryLaneCLI(auto_register=False)
+
+                        args = MagicMock()
+                        args.query = ""
+                        args.max_tokens = 2000
+                        args.min_relevance = 0.3
+                        args.limit = 20
+                        args.all_projects = False
+                        args.projects = None
+
+                        cli.cmd_context(args)
+
+                        captured = capsys.readouterr()
+                        assert captured.out == ""

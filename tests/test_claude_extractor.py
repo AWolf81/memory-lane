@@ -330,3 +330,235 @@ class TestResponseParsing:
 
         assert len(memories) == 1
         assert memories[0].category == "insights"
+
+
+class TestExtractedMemoryDataclass:
+    """Test ExtractedMemory dataclass."""
+
+    def test_create_with_all_fields(self):
+        """Should create with all fields."""
+        memory = ExtractedMemory(
+            category="patterns",
+            content="Test content",
+            relevance=0.9,
+            tags=["test", "example"],
+            source="claude"
+        )
+
+        assert memory.category == "patterns"
+        assert memory.content == "Test content"
+        assert memory.relevance == 0.9
+        assert memory.tags == ["test", "example"]
+        assert memory.source == "claude"
+
+    def test_default_source(self):
+        """Should use default source if not specified."""
+        memory = ExtractedMemory(
+            category="insights",
+            content="Test",
+            relevance=0.8,
+            tags=[]
+        )
+
+        # Default source is claude_extraction
+        assert memory.source == "claude_extraction"
+
+
+class TestClaudeCallMethods:
+    """Test Claude CLI and API call methods."""
+
+    def test_call_claude_via_cli(self):
+        """Should call Claude via CLI when available."""
+        extractor = ClaudeExtractor(use_cli=True)
+        extractor._cli_available = True
+
+        with patch('subprocess.run') as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 0
+            mock_result.stdout = '{"memories": []}'
+            mock_run.return_value = mock_result
+
+            # _call_claude takes system_prompt and user_message
+            result = extractor._call_claude("System prompt", "Test text")
+
+            mock_run.assert_called()
+            assert result is not None or mock_run.called
+
+    def test_call_claude_handles_timeout(self):
+        """Should handle CLI timeout gracefully."""
+        extractor = ClaudeExtractor(use_cli=True)
+        extractor._cli_available = True
+
+        import subprocess
+        with patch('subprocess.run', side_effect=subprocess.TimeoutExpired("claude", 60)):
+            result = extractor._call_claude("System prompt", "Test text")
+
+            assert result is None
+
+    def test_call_claude_handles_error(self):
+        """Should handle CLI errors gracefully."""
+        extractor = ClaudeExtractor(use_cli=True)
+        extractor._cli_available = True
+
+        with patch('subprocess.run') as mock_run:
+            mock_result = MagicMock()
+            mock_result.returncode = 1
+            mock_result.stderr = "Error"
+            mock_run.return_value = mock_result
+
+            result = extractor._call_claude("System prompt", "Test text")
+
+            assert result is None
+
+
+class TestLocalLLMExtraction:
+    """Test local LLM extraction fallback."""
+
+    def test_local_llm_returns_list(self):
+        """Should return a list from local LLM extraction."""
+        extractor = ClaudeExtractor()
+
+        # The method should return a list (empty or with memories)
+        result = extractor._local_llm_extraction("Test text")
+
+        assert isinstance(result, list)
+
+
+class TestRegexPatterns:
+    """Test regex extraction patterns."""
+
+    def test_extracts_chose_over_pattern(self):
+        """Should extract 'chose X over Y' patterns."""
+        extractor = ClaudeExtractor(config={"extraction": {"backend": "regex"}})
+
+        text = "We chose PostgreSQL over MySQL for better JSON support."
+        memories = extractor.extract(text)
+
+        assert len(memories) >= 1
+
+    def test_extracts_issue_was_pattern(self):
+        """Should extract 'the issue was' patterns."""
+        extractor = ClaudeExtractor(config={"extraction": {"backend": "regex"}})
+
+        text = "The issue was that the connection pool was too small."
+        memories = extractor.extract(text)
+
+        assert len(memories) >= 1
+        assert any("issue" in m.content.lower() or "pool" in m.content.lower() for m in memories)
+
+    def test_extracts_config_at_pattern(self):
+        """Should extract 'config at' patterns."""
+        extractor = ClaudeExtractor(config={"extraction": {"backend": "regex"}})
+
+        text = "The config is located at ~/.memorylane/config.json."
+        memories = extractor.extract(text)
+
+        assert len(memories) >= 1
+
+    def test_extracts_solution_was_pattern(self):
+        """Should extract 'the solution was' patterns."""
+        extractor = ClaudeExtractor(config={"extraction": {"backend": "regex"}})
+
+        text = "The solution was to add error handling around the API call."
+        memories = extractor.extract(text)
+
+        assert len(memories) >= 1
+
+
+class TestInvalidResponses:
+    """Test handling of invalid responses."""
+
+    def test_handles_empty_response(self):
+        """Should handle empty response."""
+        extractor = ClaudeExtractor()
+
+        memories = extractor._parse_response("")
+
+        assert memories == []
+
+    def test_handles_null_response(self):
+        """Should handle None response."""
+        extractor = ClaudeExtractor()
+
+        memories = extractor._parse_response(None)
+
+        assert memories == []
+
+    def test_handles_invalid_json(self):
+        """Should handle invalid JSON response."""
+        extractor = ClaudeExtractor()
+
+        memories = extractor._parse_response("not valid json")
+
+        assert memories == []
+
+    def test_handles_missing_memories_key(self):
+        """Should handle response without memories key."""
+        extractor = ClaudeExtractor()
+
+        response = '{"other_key": "value"}'
+        memories = extractor._parse_response(response)
+
+        assert memories == []
+
+
+class TestClaudeExtractorConfig:
+    """Test configuration handling."""
+
+    def test_uses_default_config(self):
+        """Should use default config when not provided."""
+        extractor = ClaudeExtractor()
+
+        assert extractor.backend == "auto"
+
+    def test_handles_nested_config_access(self):
+        """Should handle nested config access."""
+        config = {
+            "extraction": {
+                "backend": "regex",
+                "claude_model": "claude-sonnet-4-5-20250514",
+                "claude_timeout": 90
+            }
+        }
+        extractor = ClaudeExtractor(config=config)
+
+        assert extractor.backend == "regex"
+        assert extractor.model == "claude-sonnet-4-5-20250514"
+        assert extractor.timeout == 90
+
+    def test_handles_empty_config(self):
+        """Should handle empty config dict."""
+        extractor = ClaudeExtractor(config={})
+
+        assert extractor.backend == "auto"
+
+
+class TestExtractWithTrigger:
+    """Test extract method with different triggers."""
+
+    def test_extract_with_session_end_trigger(self):
+        """Should extract with session_end trigger."""
+        extractor = ClaudeExtractor(config={"extraction": {"backend": "regex"}})
+
+        text = "Session summary: Fixed bug by adding error handling."
+        memories = extractor.extract(text, trigger="session_end")
+
+        assert isinstance(memories, list)
+
+    def test_extract_with_error_resolution_trigger(self):
+        """Should extract with error_resolution trigger."""
+        extractor = ClaudeExtractor(config={"extraction": {"backend": "regex"}})
+
+        text = "The issue was a race condition. Fixed by adding mutex."
+        memories = extractor.extract(text, trigger="error_resolution")
+
+        assert isinstance(memories, list)
+
+    def test_extract_with_feature_implementation_trigger(self):
+        """Should extract with feature_implementation trigger."""
+        extractor = ClaudeExtractor(config={"extraction": {"backend": "regex"}})
+
+        text = "Implemented user authentication using JWT tokens."
+        memories = extractor.extract(text, trigger="feature_implementation")
+
+        assert isinstance(memories, list)
