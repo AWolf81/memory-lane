@@ -1,5 +1,8 @@
 # MemoryLane 🧠
 
+[![Tests](https://github.com/AWolf81/memory-lane/actions/workflows/tests.yml/badge.svg)](https://github.com/AWolf81/memory-lane/actions/workflows/tests.yml)
+[![codecov](https://codecov.io/gh/AWolf81/memory-lane/graph/badge.svg)](https://codecov.io/gh/AWolf81/memory-lane)
+
 > **Note:** "MemoryLane" is a working title. The name may change before v1.0. Name suggestions welcome!
 
 **Local-first persistent memory for Claude Code with automatic cost savings**
