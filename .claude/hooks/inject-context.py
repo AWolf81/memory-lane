@@ -30,25 +30,36 @@ DEFAULT_CONTEXT_ROT = {
 }
 
 
-def get_memorylane_root() -> Path:
-    """Find the MemoryLane installation directory"""
+def get_memorylane_install() -> Path:
+    """Find where MemoryLane CLI is installed (contains src/cli.py)"""
     # Check environment variable first
     if 'MEMORYLANE_ROOT' in os.environ:
         return Path(os.environ['MEMORYLANE_ROOT'])
 
     # Check relative to this script (hooks are in .claude/hooks/)
-    script_dir = Path(__file__).parent
+    # This works even when hook is symlinked from another project
+    script_dir = Path(__file__).resolve().parent
     memorylane_root = script_dir.parent.parent
 
     # Verify it's the right directory
     if (memorylane_root / 'src' / 'cli.py').exists():
         return memorylane_root
 
-    # Fall back to CLAUDE_PROJECT_DIR
+    return None
+
+
+def get_project_dir() -> Path:
+    """Get the current project directory (where memories are stored)
+
+    Uses CLAUDE_PROJECT_DIR if set (allows hooks to work via symlinks).
+    This is the directory containing .memorylane/ for this project.
+    """
+    # CLAUDE_PROJECT_DIR is set by Claude Code to the project root
     project_dir = os.environ.get('CLAUDE_PROJECT_DIR', '')
     if project_dir:
         return Path(project_dir)
 
+    # Fall back to current working directory
     return Path.cwd()
 
 
@@ -155,8 +166,15 @@ def main():
         if not prompt:
             sys.exit(0)
 
-        memorylane_root = get_memorylane_root()
-        config = load_config(memorylane_root)
+        # Get MemoryLane installation (for CLI) and project dir (for memories)
+        memorylane_install = get_memorylane_install()
+        project_dir = get_project_dir()
+
+        if not memorylane_install:
+            # MemoryLane CLI not found
+            sys.exit(0)
+
+        config = load_config(project_dir)
 
         max_context_tokens = get_config_value(
             config,
@@ -210,19 +228,16 @@ def main():
         if not query:
             sys.exit(0)
 
-        cli_path = memorylane_root / 'src' / 'cli.py'
+        cli_path = memorylane_install / 'src' / 'cli.py'
 
-        if not cli_path.exists():
-            # MemoryLane not found, exit silently
-            sys.exit(0)
-
-        # Check if memories exist
-        memories_file = memorylane_root / '.memorylane' / 'memories.json'
+        # Check if memories exist in this project
+        memories_file = project_dir / '.memorylane' / 'memories.json'
         if not memories_file.exists():
             # No memories yet, exit silently
             sys.exit(0)
 
         # Call MemoryLane CLI to get context
+        # Run with cwd=project_dir so CLI uses that project's .memorylane/
         result = subprocess.run(
             [
                 sys.executable,  # Use same Python interpreter
@@ -233,7 +248,7 @@ def main():
                 '--min-relevance', '0.6',  # Higher threshold for focused results
                 '--limit', '10'
             ],
-            cwd=str(memorylane_root),
+            cwd=str(project_dir),  # Use project dir for .memorylane lookup
             capture_output=True,
             text=True,
             timeout=5  # 5 second timeout

@@ -5,6 +5,31 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as crypto from 'crypto';
 
+// Output channel for debugging - visible in Output panel
+let outputChannel: vscode.OutputChannel | null = null;
+
+function getOutputChannel(): vscode.OutputChannel {
+    if (!outputChannel) {
+        outputChannel = vscode.window.createOutputChannel('MemoryLane');
+    }
+    return outputChannel;
+}
+
+function log(message: string, level: 'info' | 'warn' | 'error' = 'info'): void {
+    const timestamp = new Date().toISOString().slice(11, 23);
+    const prefix = level === 'error' ? '❌' : level === 'warn' ? '⚠️' : '📝';
+    const line = `[${timestamp}] ${prefix} ${message}`;
+
+    getOutputChannel().appendLine(line);
+
+    // Also log to console for Developer Tools
+    if (level === 'error') {
+        console.error(`[MemoryLane] ${message}`);
+    } else {
+        console.log(`[MemoryLane] ${message}`);
+    }
+}
+
 export interface MemoryStats {
     memory: {
         total_memories: number;
@@ -48,6 +73,13 @@ export class SidecarManager {
         this.sidecarRoot = path.dirname(context.extensionPath);
         // Generate workspace-specific socket path for isolation
         this.socketPath = this.getWorkspaceSocketPath();
+
+        // Log initialization details
+        log('SidecarManager initialized');
+        log(`  extensionPath: ${context.extensionPath}`);
+        log(`  sidecarRoot: ${this.sidecarRoot}`);
+        log(`  workspaceRoot: ${this.workspaceRoot || '(none)'}`);
+        log(`  socketPath: ${this.socketPath}`);
     }
 
     private getWorkspaceSocketPath(): string {
@@ -62,8 +94,21 @@ export class SidecarManager {
 
     async start(): Promise<void> {
         if (this.serverProcess) {
-            console.log('Sidecar already running');
+            log('Sidecar already running (has process reference)');
             return;
+        }
+
+        // Check if socket already exists (server running from previous session)
+        if (fs.existsSync(this.socketPath)) {
+            log(`Socket already exists: ${this.socketPath}`);
+            try {
+                await this.sendRequest({ action: 'ping' }, 2000);
+                log('Existing server responded to ping - reusing');
+                return;
+            } catch {
+                log('Existing socket unresponsive - removing stale socket', 'warn');
+                fs.unlinkSync(this.socketPath);
+            }
         }
 
         const config = vscode.workspace.getConfiguration('memorylane');
@@ -74,50 +119,95 @@ export class SidecarManager {
         // Use workspace if available, otherwise use sidecar root for data storage
         const dataDir = this.workspaceRoot || this.sidecarRoot;
 
-        // Validate server script exists
+        log('Starting MemoryLane sidecar...');
+        log(`  pythonPath: ${pythonPath}`);
+        log(`  serverScript: ${serverScript}`);
+        log(`  dataDir (cwd): ${dataDir}`);
+        log(`  socketPath: ${this.socketPath}`);
+
+        // Validate paths exist
         if (!fs.existsSync(serverScript)) {
-            throw new Error(`Server script not found: ${serverScript}`);
+            const error = `Server script not found: ${serverScript}`;
+            log(error, 'error');
+            throw new Error(error);
         }
 
-        console.log('Starting MemoryLane sidecar...');
-        console.log(`Python: ${pythonPath}, Script: ${serverScript}`);
+        if (!fs.existsSync(dataDir)) {
+            const error = `Data directory not found: ${dataDir}`;
+            log(error, 'error');
+            throw new Error(error);
+        }
+
+        // Check if .memorylane folder exists, create if not
+        const memorylaneDir = path.join(dataDir, '.memorylane');
+        if (!fs.existsSync(memorylaneDir)) {
+            log(`Creating .memorylane directory: ${memorylaneDir}`);
+            fs.mkdirSync(memorylaneDir, { recursive: true });
+        }
 
         // Collect stderr for error reporting
         let stderrOutput = '';
+        let stdoutOutput = '';
 
-        this.serverProcess = child_process.spawn(pythonPath, [serverScript, 'start', '--socket', this.socketPath], {
+        const args = [serverScript, 'start', '--socket', this.socketPath];
+        log(`Spawning: ${pythonPath} ${args.join(' ')}`);
+
+        this.serverProcess = child_process.spawn(pythonPath, args, {
             cwd: dataDir,
             detached: true,
-            stdio: ['ignore', 'ignore', 'pipe']  // Capture stderr
+            stdio: ['ignore', 'pipe', 'pipe']  // Capture both stdout and stderr
         });
+
+        const pid = this.serverProcess.pid;
+        log(`Spawned process with PID: ${pid}`);
+
+        // Capture stdout for debugging
+        if (this.serverProcess.stdout) {
+            this.serverProcess.stdout.on('data', (data) => {
+                stdoutOutput += data.toString();
+                log(`stdout: ${data.toString().trim()}`);
+            });
+        }
 
         // Capture stderr for debugging
         if (this.serverProcess.stderr) {
             this.serverProcess.stderr.on('data', (data) => {
                 stderrOutput += data.toString();
-                console.error('Sidecar stderr:', data.toString());
+                log(`stderr: ${data.toString().trim()}`, 'warn');
             });
         }
 
         // Handle process errors
         this.serverProcess.on('error', (err) => {
-            console.error('Failed to spawn sidecar process:', err);
+            log(`Process spawn error: ${err.message}`, 'error');
+        });
+
+        this.serverProcess.on('exit', (code, signal) => {
+            log(`Process exited: code=${code}, signal=${signal}`, code === 0 ? 'info' : 'error');
         });
 
         this.serverProcess.unref();
 
         // Wait for server to be ready
+        log('Waiting for server to be ready...');
         try {
             await this.waitForServer();
+            log('Server is ready and responding');
         } catch (e) {
             // Clean up process reference on failure
             this.serverProcess = null;
 
             // Provide more helpful error message
-            let errorMsg = 'Server failed to start';
+            let errorMsg = 'Server failed to start within timeout';
             if (stderrOutput) {
-                errorMsg += `: ${stderrOutput.trim().split('\n').pop()}`;
+                errorMsg += `\nStderr: ${stderrOutput.trim()}`;
             }
+            if (stdoutOutput) {
+                errorMsg += `\nStdout: ${stdoutOutput.trim()}`;
+            }
+            errorMsg += `\nCheck Output panel (View → Output → MemoryLane) for details`;
+
+            log(errorMsg, 'error');
             throw new Error(errorMsg);
         }
 
@@ -125,18 +215,23 @@ export class SidecarManager {
     }
 
     async stop(): Promise<void> {
+        log('Stopping sidecar...');
+
         if (!this.serverProcess) {
+            log('No server process to stop');
             return;
         }
 
         try {
-            await this.sendRequest({ action: 'shutdown' });
+            await this.sendRequest({ action: 'shutdown' }, 5000);
+            log('Server shutdown command sent');
         } catch (e) {
-            // Server may already be stopped
+            log('Server may already be stopped', 'warn');
         }
 
         this.serverProcess = null;
         this.stopLearning();
+        log('Sidecar stopped');
     }
 
     private async waitForServer(maxAttempts = 10): Promise<void> {
@@ -151,8 +246,21 @@ export class SidecarManager {
         throw new Error('Server failed to start');
     }
 
-    private async sendRequest(request: any): Promise<any> {
+    private async sendRequest(request: any, timeoutMs: number = 10000): Promise<any> {
         return new Promise((resolve, reject) => {
+            const action = request.action || 'unknown';
+            let settled = false;
+
+            // Timeout handler
+            const timeout = setTimeout(() => {
+                if (!settled) {
+                    settled = true;
+                    log(`Request timeout: ${action} after ${timeoutMs}ms`, 'error');
+                    client.destroy();
+                    reject(new Error(`Request timeout: ${action}`));
+                }
+            }, timeoutMs);
+
             const client = net.createConnection(this.socketPath, () => {
                 client.write(JSON.stringify(request) + '\n');
             });
@@ -161,18 +269,32 @@ export class SidecarManager {
             client.on('data', (chunk) => {
                 data += chunk.toString();
                 if (data.includes('\n')) {
-                    client.end();
-                    try {
-                        const response = JSON.parse(data.trim());
-                        resolve(response);
-                    } catch (e) {
-                        reject(new Error('Invalid JSON response'));
+                    clearTimeout(timeout);
+                    if (!settled) {
+                        settled = true;
+                        client.end();
+                        try {
+                            const response = JSON.parse(data.trim());
+                            resolve(response);
+                        } catch (e) {
+                            log(`Invalid JSON response for ${action}: ${data.slice(0, 100)}`, 'error');
+                            reject(new Error('Invalid JSON response'));
+                        }
                     }
                 }
             });
 
             client.on('error', (err) => {
-                reject(err);
+                clearTimeout(timeout);
+                if (!settled) {
+                    settled = true;
+                    log(`Socket error for ${action}: ${err.message}`, 'error');
+                    reject(err);
+                }
+            });
+
+            client.on('close', () => {
+                clearTimeout(timeout);
             });
         });
     }
@@ -360,6 +482,40 @@ export class SidecarManager {
     getWorkspaceName(): string {
         return path.basename(this.workspaceRoot) || 'current';
     }
+
+    /**
+     * Get debug information about the current state
+     */
+    getDebugInfo(): DebugInfo {
+        return {
+            workspaceRoot: this.workspaceRoot,
+            sidecarRoot: this.sidecarRoot,
+            socketPath: this.socketPath,
+            hasServerProcess: this.serverProcess !== null,
+            hasLearningProcess: this.learningProcess !== null,
+            socketExists: fs.existsSync(this.socketPath),
+            memorylaneExists: fs.existsSync(path.join(this.workspaceRoot || this.sidecarRoot, '.memorylane')),
+            serverScriptExists: fs.existsSync(path.join(this.sidecarRoot, 'src', 'server.py'))
+        };
+    }
+
+    /**
+     * Show the output channel for debugging
+     */
+    showOutput(): void {
+        getOutputChannel().show();
+    }
+}
+
+export interface DebugInfo {
+    workspaceRoot: string;
+    sidecarRoot: string;
+    socketPath: string;
+    hasServerProcess: boolean;
+    hasLearningProcess: boolean;
+    socketExists: boolean;
+    memorylaneExists: boolean;
+    serverScriptExists: boolean;
 }
 
 export interface ProjectInfo {

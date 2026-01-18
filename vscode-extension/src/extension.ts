@@ -102,6 +102,55 @@ export async function activate(context: vscode.ExtensionContext) {
             overviewTreeProvider.toggleScope();
         }),
 
+        vscode.commands.registerCommand('memorylane.showDebugInfo', async () => {
+            const debugInfo = sidecarManager.getDebugInfo();
+            const lines = [
+                '🔍 MemoryLane Debug Info',
+                '═'.repeat(50),
+                '',
+                '📁 Paths:',
+                `  workspaceRoot: ${debugInfo.workspaceRoot || '(none)'}`,
+                `  sidecarRoot: ${debugInfo.sidecarRoot}`,
+                `  socketPath: ${debugInfo.socketPath}`,
+                '',
+                '✓ Status:',
+                `  serverProcess: ${debugInfo.hasServerProcess ? 'running' : 'not running'}`,
+                `  learningProcess: ${debugInfo.hasLearningProcess ? 'running' : 'not running'}`,
+                `  socketExists: ${debugInfo.socketExists ? 'yes' : 'no'}`,
+                `  .memorylane exists: ${debugInfo.memorylaneExists ? 'yes' : 'no'}`,
+                `  server.py exists: ${debugInfo.serverScriptExists ? 'yes' : 'no'}`,
+                '',
+                '💡 Tips:',
+                '  - View → Output → MemoryLane for detailed logs',
+                '  - If socket exists but server not running, restart extension',
+            ];
+
+            // Try to get server stats if connected
+            try {
+                const stats = await sidecarManager.getStats();
+                lines.push('');
+                lines.push('📊 Server Stats:');
+                lines.push(`  Total memories: ${stats.memory.total_memories}`);
+                lines.push(`  Requests handled: ${stats.server.requests_handled}`);
+            } catch {
+                lines.push('');
+                lines.push('⚠️ Cannot connect to server');
+            }
+
+            const doc = await vscode.workspace.openTextDocument({
+                content: lines.join('\n'),
+                language: 'plaintext'
+            });
+            await vscode.window.showTextDocument(doc, { preview: true });
+
+            // Also show output channel
+            sidecarManager.showOutput();
+        }),
+
+        vscode.commands.registerCommand('memorylane.showOutput', () => {
+            sidecarManager.showOutput();
+        }),
+
         vscode.commands.registerCommand('memorylane.startLearning', async () => {
             await sidecarManager.startLearning();
             vscode.window.showInformationMessage('MemoryLane learning started');

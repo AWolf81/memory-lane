@@ -56,6 +56,14 @@
       {
         "command": "memorylane.exportContext",
         "title": "MemoryLane: Export Context as Markdown"
+      },
+      {
+        "command": "memorylane.showDebugInfo",
+        "title": "MemoryLane: Show Debug Info"
+      },
+      {
+        "command": "memorylane.showOutput",
+        "title": "MemoryLane: Show Output Log"
       }
     ],
     "viewsContainers": {
