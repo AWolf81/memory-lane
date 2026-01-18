@@ -680,7 +680,7 @@ class ConversationLearner:
 
         return False
 
-    def _clean_content(self, text: str) -> str | None:
+    def _clean_content(self, text: str) -> Optional[str]:
         """
         Clean and normalize content for storage.
         Returns None if content doesn't pass quality checks.
